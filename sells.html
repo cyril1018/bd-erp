@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <!-- import CSS -->
+    <link rel="stylesheet" href="./element-ui/lib/theme-chalk/index.css" />
+    <style>
+      .subtable-container {
+        padding: 1%;
+        padding-right: 19%;
+        background-color: #f2f2f2;
+      }
+    </style>
+    <style>
+      [v-cloak] {
+        display: none;
+      }
+    </style>
+    <style>
+      .hidden {
+        display: none;
+      }
+
+      #notification {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background-color: #ff9800;
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="notification" class="hidden"></div>
+    <div id="app" v-cloak>
+      <el-container>
+        <custom-menu></custom-menu>
+        <el-container>
+          <el-main>
+            <el-divider content-position="left">銷貨管理</el-divider>
+            <div>
+              <el-button type="primary" icon="el-icon-search" @click="doQuery"
+                >查詢</el-button
+              >
+              <el-button
+                type="primary"
+                icon="el-icon-plus"
+                class="btn-add"
+                plain
+                @click="add"
+                >新增</el-button
+              >
+              <el-button type="info" icon="el-icon-document" @click="print"
+                >列印</el-button
+              >
+            </div>
+            <el-divider></el-divider>
+            <el-form :inline="true" label-width="150px">
+              <el-form-item label="客戶編號(名稱)">
+                <el-autocomplete
+                  :trigger-on-focus="false"
+                  v-model="customerNoName"
+                  :fetch-suggestions="querySearch"
+                  placeholder="请输入"
+                  @select="handleSelect"
+                  :highlight-first-item="true"
+                  clearable
+                ></el-autocomplete>
+              </el-form-item>
+              <el-form-item label="日期">
+                <el-date-picker
+                  v-model="dateBegin"
+                  type="date"
+                  placeholder="選擇日期"
+                  @blur="focusNext"
+                >
+                </el-date-picker>
+                ~
+                <el-date-picker
+                  v-model="dateEnd"
+                  type="date"
+                  placeholder="選擇日期"
+                  :name="'dateEnd'"
+                >
+                </el-date-picker>
+              </el-form-item>
+            </el-form>
+            <el-divider></el-divider>
+            <span style="margin-top: 20px" v-if="loading">載入中...</span>
+            <el-table :data="rows" height="95vh" stripe>
+              <el-table-column prop="items" label="" type="expand">
+                <template slot-scope="scope">
+                  <div class="subtable-container">
+                    <el-table :data="scope.row.items" border>
+                      <el-table-column label="#" prop="id" width="50">
+                        <template slot-scope="scope">
+                          <span>{{scope.$index + 1}}</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column
+                        label="產品編號"
+                        prop="no"
+                        width="150"
+                      ></el-table-column>
+                      <el-table-column
+                        label="產品名稱"
+                        prop="name"
+                      ></el-table-column>
+                      <el-table-column
+                        label="數量"
+                        prop="qty"
+                        width="50"
+                        align="right"
+                      ></el-table-column>
+                      <el-table-column
+                        label="單價"
+                        prop="price"
+                        width="100"
+                        align="right"
+                      ></el-table-column>
+                      <el-table-column
+                        label="小計"
+                        prop="total"
+                        width="120"
+                        align="right"
+                      ></el-table-column>
+                    </el-table>
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column prop="id" label="#" width="50">
+                <template slot-scope="scope">
+                  <span>{{scope.$index + 1 }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="sellDate" label="日期"> </el-table-column>
+              <el-table-column prop="no" label="單號"> </el-table-column>
+              <el-table-column prop="customerNo" label="客戶編號">
+              </el-table-column>
+              <el-table-column prop="customerName" label="客戶名稱">
+              </el-table-column>
+              <el-table-column prop="total" label="總計金額" align="right">
+              </el-table-column>
+              <el-table-column
+                fixed="right"
+                align="center"
+                label="操作"
+                width="200"
+              >
+                <template slot-scope="scope">
+                  <el-button
+                    @click="handleDelete(scope.row.id)"
+                    type="text"
+                    size="small"
+                    >刪除</el-button
+                  >
+                  <el-button
+                    @click="handleUpdate(scope.row.id)"
+                    type="text"
+                    size="small"
+                    >编辑</el-button
+                  >
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-main>
+        </el-container>
+      </el-container>
+    </div>
+  </body>
+  <!-- import Vue before Element -->
+  <script src="./vue.js"></script>
+  <script src="./jquery-3.7.0.min.js"></script>
+  <!-- import JavaScript -->
+  <script src="./element-ui/lib/index.js"></script>
+  <script src="./components/custom-menu.js"></script>
+  <script src="enterAsTab.js"></script>
+  <script>
+    let vm = new Vue({
+      el: "#app",
+      data: function () {
+        return {
+          customer: null,
+          customerNoName: null,
+          customers: [],
+          dateBegin: null,
+          dateEnd: null,
+          rows: [],
+          loading: true,
+          showNoDataMsg: false,
+        };
+      },
+      methods: {
+        focusNext: function () {
+          let $focused = $(":focus");
+          if ($focused.length == 0) {
+            $('input[name="dateEnd"]').focus();
+          }
+        },
+        routeTo: function (url) {
+          location.href = url;
+        },
+        add: function () {
+          let qry = this.getQueryString();
+          if (qry) {
+            qry = "?" + qry;
+          } else {
+            qry = "";
+          }
+
+          this.routeTo("sells-edit.html" + qry);
+        },
+        createFilter(queryString) {
+          return (restaurant) => {
+            return (
+              restaurant.value
+                .toLowerCase()
+                .indexOf(queryString.toLowerCase()) === 0
+            );
+          };
+        },
+        handleDelete: function (id) {
+          this.$confirm("將刪除此銷貨單, 是否繼續?", "提示", {
+            confirmButtonText: "確定",
+            cancelButtonText: "取消",
+            type: "warning",
+          })
+            .then(async () => {
+              var res = await window.api.sells.delete(id);
+              if (res.isSuccess) {
+                this.$message({
+                  type: "success",
+                  message: "删除成功!",
+                });
+                await this.reload();
+                return;
+              }
+
+              this.$message({
+                type: "error",
+                message: res.msg,
+              });
+            })
+            .catch((action) => {});
+        },
+        handleUpdate(id) {
+          var qry = this.getQueryString();
+          if (qry) {
+            qry = "&" + qry;
+          } else {
+            qry = "";
+          }
+          this.routeTo("sells-edit.html?id=" + id + qry);
+        },
+        isDate: function (value) {
+          return value instanceof Date && !isNaN(value);
+        },
+        dateToStr: function (date) {
+          if (!this.isDate(date)) {
+            return date;
+          }
+          let y = date.getFullYear().toString();
+          let m = (date.getMonth() + 1).toString();
+          let d = date.getDate().toString();
+          if (m.length == 1) {
+            m = "0" + m;
+          }
+          if (d.length == 1) {
+            d = "0" + d;
+          }
+
+          return `${y}-${m}-${d}`;
+        },
+        doQuery: async function () {
+          this.showNoDataMsg = true;
+          await this.reload();
+        },
+        getQueryString: function () {
+          const queryParams = {
+            customerId: this.customer?.id,
+            customerNoName: this.customerNoName,
+            dateBegin: this.dateToStr(this.dateBegin),
+            dateEnd: this.dateToStr(this.dateEnd),
+          };
+
+          return Object.keys(queryParams)
+            .map((key) =>
+              !queryParams[key]
+                ? ""
+                : `${encodeURIComponent(key)}=${encodeURIComponent(
+                    queryParams[key]
+                  )}`
+            )
+            .filter((key) => key)
+            .join("&");
+        },
+        print: function () {
+          if (!this.customer && !this.customerNoName) {
+            vm.$message({
+              message: "請先選擇客戶",
+              type: "warning",
+            });
+            return;
+          }
+          if (!this.dateBegin || !this.dateEnd) {
+            vm.$message({
+              message: "請先選擇日期起迄",
+              type: "warning",
+            });
+            return;
+          }
+          window.open(`sells-print.html?${this.getQueryString()}`, "_self");
+        },
+        reload: async function () {
+          this.loading = true;
+          var rows = await window.api.sells.get({
+            customerId: this.customer?.id,
+            customerNoName: this.customerNoName,
+            dateBegin: this.dateToStr(this.dateBegin),
+            dateEnd: this.dateToStr(this.dateEnd),
+          });
+          while (this.rows.length != 0) {
+            this.rows.pop();
+          }
+
+          rows.forEach((el) => {
+            el.total = el.total.toLocaleString();
+            if (el.items) {
+              el.items.forEach((el) => {
+                el.qty = el.qty.toLocaleString();
+                el.price = el.price.toLocaleString();
+                el.total = el.total.toLocaleString();
+              });
+            }
+
+            this.rows.push(el);
+          }, this);
+          if (this.showNoDataMsg && this.rows.length == 0) {
+            vm.$message({
+              message: "查無資料",
+              type: "info",
+            });
+          }
+          this.loading = false;
+        },
+        querySearch(queryString, cb) {
+          var customers = this.customers;
+          var results = queryString
+            ? customers.filter(this.createFilter(queryString))
+            : customers;
+          // 调用 callback 返回建议列表的数据
+          cb(results);
+        },
+        handleSelect(item) {
+          this.customer = item.raw;
+        },
+      },
+      watch: {},
+      async beforeMount() {
+        let customers = await window.api.customers.getAll();
+        this.customers = customers.map(function (item) {
+          return {
+            value: item.no + " (" + item.name + ")",
+            raw: item,
+          };
+        });
+
+        let now = new Date();
+
+        let dateE = new Date();
+        if (dateE.getDate() >= 25) {
+          dateE.setDate(25);
+        } else {
+          dateE.setDate(25);
+          if (dateE.getMonth() == 0) {
+            dateE.setMonth(11);
+            dateE.setFullYear(dateE.getFullYear() - 1);
+          } else {
+            dateE.setMonth(dateE.getMonth() - 1);
+          }
+        }
+
+        let dateB = new Date();
+        dateB.setDate(26);
+        if (dateE.getMonth() == 0) {
+          dateB.setFullYear(dateE.getFullYear() - 1);
+          dateB.setMonth(11);
+        } else {
+          dateB.setFullYear(dateE.getFullYear());
+          dateB.setMonth(dateE.getMonth() - 1);
+        }
+        this.dateBegin = this.dateToStr(dateB);
+        this.dateEnd = this.dateToStr(dateE);
+
+        // 取得當前頁面 URL 的 search 參數
+        const params = new URLSearchParams(window.location.search);
+        const dateBegin = params.get("dateBegin");
+        const dateEnd = params.get("dateEnd");
+        const qryCustomerId = params.get("customerId");
+        const customerNoName = params.get("customerNoName");
+        const clearDate = params.get("clearDate") == "true";
+
+        if (dateBegin) this.dateBegin = dateBegin;
+        if (dateEnd) this.dateEnd = dateEnd;
+        if (customerNoName) this.customerNoName = customerNoName;
+        if (qryCustomerId) this.customer = { id: qryCustomerId };
+
+        if (clearDate) {
+          this.dateBegin = "";
+          this.dateEnd = "";
+        }
+        await this.reload();
+      },
+      mounted() {
+        setTimeout(hookEnterAsTab, 100);
+      },
+    });
+
+    // 取得當前頁面 URL 的 search 參數
+    const params = new URLSearchParams(window.location.search);
+
+    // 使用 get() 方法獲取指定參數的值
+    const msg = params.get("msg");
+
+    if (msg) {
+      vm.$message({
+        message: msg,
+        type: "success",
+      });
+    }
+
+    $(".btn-add").focus();
+  </script>
+  <script src="src/updateHandler.js"></script>
+</html>

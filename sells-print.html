@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <link rel="stylesheet" href="./element-ui/lib/theme-chalk/index.css">
+    <style>
+        @media print {
+            .no-print {
+                display: none;
+            }
+
+            .print-page {
+                page-break-before: always;
+            }
+
+            .print-section {
+                page-break-after: always;
+            }
+
+            .print-content {
+                page-break-inside: avoid;
+            }
+            body {
+                background-color: transparent;
+                background-image: none;
+            }
+            @page{
+                margin: 0.25cm 0.5cm 0.25cm 0.5cm;
+            }
+            h3 {
+                margin-block-start: 0em !important;
+                margin-block-end:  0em !important;
+            }
+        }
+
+       
+        /*
+            @page {
+                @top-left-corner {
+                 
+                }
+                @top-left {
+           
+                }
+                @top-center {
+                    content: "銷貨明細表";
+                    font-size: large;
+                    font-weight: bolder;
+                }
+                @top-right {
+         
+                }
+                @top-right-corner {
+                }
+                @left-top {
+                }
+                @left-middle {
+                }
+                @left-bottom {
+                }
+                @right-top {
+                }
+                @right-middle {
+                }
+                @right-bottom {
+                }
+                @bottom-left-corner {
+                }
+                @bottom-left {
+                }
+                @bottom-center {
+                }
+                @bottom-right {
+                }
+                @bottom-right-corner {
+                }
+            }
+            */
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 0px;
+            border-bottom: 1px solid #666;
+            border-top: 1px solid #666;
+            text-align: left;
+        }
+
+        th.total {
+            border-bottom: 0px solid #ccc;
+            border-top: 3px double #666;
+        }
+
+        td.text-right,
+        th.text-right {
+            text-align: right;
+
+        }
+
+        th.empty,
+        td.empty {
+            border: 0px;
+        }
+
+        thead {
+            background-color: #f2f2f2;
+        }
+
+        .print-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <div class="print-button">
+            <el-button type="info" class="no-print" @click="doBack" plain>回前頁</el-button>
+            <el-button type="primary" class="no-print" @click="doPrint" plain>列 印</el-button>
+        </div>
+        <template v-for="(customerId, idx) in customerIds">
+            <div class="print-page">
+                <div style="text-align:center;">
+                    <h3>銷貨明細表</h3>
+                </div>
+                <div>
+                    <div style="display: flex; justify-content: space-between; font-weight: bolder;">
+                        <div>
+                            <span>對象編號: {{getCustomerNo(customerId)}}</span>
+                            <span style="margin-left: 5px;">對象名稱: {{getCustomerName(customerId)}}</span>
+                        </div>
+                        <div>
+                            日期範圍: {{dateRange}}
+                        </div>
+                    </div>
+                    <table>
+                        <template v-for="row in getRowsByCustomerId(customerId)">
+                            <tr>
+                                <th class="master">日期</th>
+                                <th class="master">單號</th>
+                                <th class="master" colspan="3"></th>
+                                <th class="master text-right">總計</th>
+                            </tr>
+                            <tr>
+                                <td>{{row.sellDate}}</td>
+                                <td>{{row.no}}</th>
+                                <td colspan="3"></td>
+                                <td class="text-right">{{row.total}}</td>
+                            </tr>
+                            <tr>
+                                <th class="empty"></th>
+                                <th>產品編號</th>
+                                <th>產品名稱</th>
+                                <th class="text-right">數量</th>
+                                <th class="text-right">單價</th>
+                                <th class="text-right">小計</th>
+                            </tr>
+                            <tr v-for="item in row.items">
+                                <td class="empty"></td>
+                                <td class="empty">{{item.no}}</td>
+                                <td class="empty">{{item.name}}</td>
+                                <td class="empty text-right">{{item.qty}}</td>
+                                <td class="empty text-right">{{item.price}}</td>
+                                <td class="empty text-right">{{item.total}}</td>
+                            </tr>
+                        </template>
+                        <tr>
+                            <th colspan="5" class="total text-right">總計:</th>
+                            <th class="total text-right">{{getTotalByCustomerId(customerId)}}</th>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div v-if="idx+1 != customerIds.length" class="no-print" style="margin-top: 75px; margin-bottom: 75px;">
+                <el-divider>客戶分隔線</el-divider>
+            </div>
+        </template>
+    </div>
+</body>
+<script src="./vue.js"></script>
+<script src="./element-ui/lib/index.js"></script>
+<script>
+    window.PagedConfig = {
+        auto: false, // disable automatic script execution on document load
+    };
+
+    let vm = new Vue({
+        el: '#app',
+        data: function () {
+            return {
+                qryCustomerId: null,
+                customerIds: [],
+                customerNoName: null,
+                dateBegin: null,
+                dateEnd: null,
+                rows: [],
+            }
+        },
+        computed: {
+            dateRange: function () {
+                return `${this.dateBegin.replaceAll('-', '/')} ~ ${this.dateEnd.replaceAll('-', '/')}`
+            }
+        },
+        methods: {
+            isDate: function (value) {
+                return value instanceof Date && !isNaN(value);
+            },
+            dateToStr: function (date) {
+                if (!this.isDate(date)) {
+                    return date;
+                }
+                let y = date.getFullYear().toString();
+                let m = (date.getMonth() + 1).toString();
+                let d = date.getDate().toString();
+                if (m.length == 1) {
+                    m = '0' + m;
+                }
+                if (d.length == 1) {
+                    d = '0' + d;
+                }
+
+                return `${y}-${m}-${d}`
+            },
+            doBack: function () {
+                const queryParams = {
+                    customerId: this.customerId,
+                    customerNoName: this.customerNoName,
+                    dateBegin: this.dateToStr(this.dateBegin),
+                    dateEnd: this.dateToStr(this.dateEnd)
+                };
+
+                const queryString = Object.keys(queryParams)
+                    .map(key => !queryParams[key] ? '' : `${encodeURIComponent(key)}=${encodeURIComponent(queryParams[key])}`)
+                    .filter(key => key)
+                    .join('&');
+                window.open(`sells.html?${queryString}`, '_self')
+            },
+            doPrint: () => window.print(),
+            getRowsByCustomerId: function (customerId) {
+                return this.rows.filter(x => x.customerId == customerId).sort((a, b) => {
+                    if (a.sellDate == b.sellDate) {
+                        return a.no > b.no ? 1 : -1;
+                    }
+                    return a.sellDate > b.sellDate ? 1 : -1;
+                })
+            },
+            getRowByCustomerId: function (customerId) {
+                return this.getRowsByCustomerId(customerId)[0]
+
+            },
+            getTotalByCustomerId: function (customerId) {
+                let rows = this.getRowsByCustomerId(customerId);
+                let sum = 0;
+                rows.forEach((x) => sum += parseInt(x.total.replaceAll(',', '')));
+                return sum.toLocaleString();
+            },
+            getCustomerNo: function (customerId) {
+                let row = this.getRowByCustomerId(customerId);
+                return row.customerNo
+            },
+            getCustomerName: function (customerId) {
+                let row = this.getRowByCustomerId(customerId);
+                return row.customerName
+            },
+            routeTo: function (url) {
+                location.href = url;
+            },
+            isDate: function (value) {
+                return value instanceof Date && !isNaN(value);
+            },
+            dateToStr: function (date) {
+                if (!this.isDate(date)) {
+                    return date;
+                }
+                let y = date.getFullYear().toString();
+                let m = (date.getMonth() + 1).toString();
+                let d = date.getDate().toString();
+                if (m.length == 1) {
+                    m = '0' + m;
+                }
+                if (d.length == 1) {
+                    d = '0' + d;
+                }
+
+                return `${y}-${m}-${d}`
+            },
+
+            reload: async function () {
+                var rows = await window.api.sells.get({
+                    customerId: this.qryCustomerId,
+                    customerNoName: this.customerNoName,
+                    dateBegin: this.dateToStr(this.dateBegin),
+                    dateEnd: this.dateToStr(this.dateEnd)
+                });
+                while (this.rows.length != 0) {
+                    this.rows.pop();
+                }
+
+                rows.forEach((el) => {
+                    el.total = el.total.toLocaleString();
+                    if (el.items) {
+                        el.items.forEach((el) => {
+                            el.qty = el.qty.toLocaleString();
+                            el.price = el.price.toLocaleString();
+                            el.total = el.total.toLocaleString();
+                        })
+                    }
+
+                    this.rows.push(el);
+                }, this);
+            },
+        },
+        watch: {
+        },
+        async mounted() {
+            // 取得當前頁面 URL 的 search 參數
+            const params = new URLSearchParams(window.location.search);
+
+            // 使用 get() 方法獲取指定參數的值
+            this.dateBegin = params.get('dateBegin');
+            this.dateEnd = params.get('dateEnd');
+            this.qryCustomerId = params.get('customerId');
+            this.customerNoName = params.get('customerNoName');
+            await this.reload();
+
+            this.rows.forEach(function (x) {
+                if (this.customerIds.findIndex(function (c) {
+                    return c == this.customerId
+                }, x) == -1) {
+                    this.customerIds.push(x.customerId);
+                }
+            }, this)
+        }
+    })
+</script>
+<!--<script src="paged.polyfill.js"></script>-->
+
+</html>

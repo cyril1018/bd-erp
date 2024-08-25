@@ -1,0 +1,46 @@
+{
+  "name": "bd-erp",
+  "version": "1.0.0",
+  "description": "An ERP app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "author": "TED",
+  "license": "CC0-1.0",
+  "devDependencies": {
+    "electron": "^22.3.13",
+    "electron-builder": "^23.6.0"
+  },
+  "dependencies": {
+    "electron-log": "^5.1.7",
+    "electron-updater": "^6.2.1",
+    "sqlite3": "^5.1.6"
+  },
+  "build": {
+    "appId": "ted.bderp",
+    "productName": "BdErp",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "cyril1018",
+        "repo": "bd-erp"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "differentialPackage": true
+    }
+  }
+}

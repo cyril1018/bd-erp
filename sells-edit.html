@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <!-- import CSS -->
+  <link rel="stylesheet" href="./element-ui/lib/theme-chalk/index.css">
+</head>
+
+<body>
+  <div id="app">
+    <el-container>
+      <el-main>
+        <el-divider content-position="left">{{title}}</el-divider>
+        <div>
+          <el-button type="primary" @click="save">存檔</el-button>
+          <el-button type="primary" @click="cancel" plain>取消</el-button>
+        </div>
+        <el-divider></el-divider>
+        <el-form :inline="true" label-width="150px">
+          <el-form-item label="客戶編號(名稱)">
+            <el-autocomplete :trigger-on-focus="false" v-if="isAdd" v-model="customerNoName"
+              :fetch-suggestions="querySearch" placeholder="请输入" @select="handleSelect" :highlight-first-item="true"
+              clearable></el-autocomplete>
+            <span v-if="isAdd">{{addr}}</span>
+            <span v-if="!isAdd">{{customerNoName}}</span>
+          </el-form-item>
+          <el-form-item label="日期">
+            <el-date-picker @blur="focusNext" v-model="date" type="date" placeholder="选择日期"
+              :picker-options="datePickerOptions">
+            </el-date-picker>
+          </el-form-item>
+        </el-form>
+
+        <el-table :data="rows" stripe show-summary :summary-method="getSummaries">
+          <el-table-column prop="id" label="#" width="100">
+            <template slot="header" slot-scope="scope">
+              <el-button type="primary" size="small" @click="addNewRow">新增</el-button>
+            </template>
+            <template slot-scope="scope">
+              <span>{{scope.$index + 1 }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="noname" label="產品">
+            <template slot-scope="scope">
+              <el-autocomplete :trigger-on-focus="false" style="width:100%" v-model="scope.row.noname"
+                :fetch-suggestions="queryItemSearch" placeholder="请输入" @select="handleItemSelect($event, scope.$index)"
+                :highlight-first-item="true" :keyup.enter="focusNext" clearable></el-autocomplete>
+            </template>
+          </el-table-column>
+          <el-table-column prop="qty" label="數量">
+            <template slot-scope="scope">
+              <el-input-number v-model="scope.row.qty" controls-position="right" :min="1"
+                @change="qtyChanged(scope.row)"></el-input-number>
+            </template>
+          </el-table-column>
+          <el-table-column prop="price" label="單價" width="120">
+            <template slot-scope="scope">
+              <el-input v-model="scope.row.price" @input="priceChanged(scope.row)" clearable></el-input>
+            </template>
+          </el-table-column>
+          <el-table-column prop="total" label="總計" width="120">
+            <template slot-scope="scope">
+              <el-input v-model="scope.row.total" @input="totalChanged(scope.row)" clearable></el-input>
+            </template>
+          </el-table-column>
+          <el-table-column fixed="right" align="center" label="操作" width="100">
+            <template slot-scope="scope">
+              <el-button @click="deleteItem(scope.row)" type="text" size="small">刪除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-main>
+    </el-container>
+  </div>
+</body>
+<!-- import Vue before Element -->
+<script src="./vue.js"></script>
+<!-- import JavaScript -->
+<script src="./element-ui/lib/index.js"></script>
+<script src="./jquery-3.7.0.min.js"></script>
+<script src="enterAsTab.js"></script>
+<script>
+  let vm = new Vue({
+    el: '#app',
+    data: function () {
+      return {
+        id: null,
+        rows: [],
+        search: '',
+        customerNoName: null,
+        customers: [],
+        customer: null,
+        date: null,
+        items: [],
+        sellNo: null,
+        sell: null,
+        delItemIds: [],
+        datePickerOptions: {
+
+
+        }
+      }
+    },
+    computed: {
+      addr: function () {
+        return this.customer?.addr
+      },
+      dateDisplay: function () {
+        return this.dateToStr(this.date)?.replaceAll('-', '/');
+      },
+      isAdd: function () {
+        return this.id == null;
+      },
+      title: function () {
+        if (this.isAdd) {
+          return '新增銷貨單'
+        }
+        return '修改銷貨單 ' + this.sellNo;
+      }
+    },
+    methods: {
+      focusNext: function () {
+        let $focused = $(':focus');
+        if ($focused.length == 0) {
+          $('table tbody').find('input:visible:first').focus();
+        }
+
+      },
+      addSell: async function () {
+        let sum = 0;
+        this.rows.filter(x => x.item != null).forEach(function (x) {
+          sum += x.total;
+        })
+        var result = await window.api.sells.add(
+          {
+            customer: this.customer,
+            date: new Date(this.date),
+            total: sum,
+            items: this.rows.filter(x => x.item != null)
+          }
+        );
+
+        if (result.isSuccess) {
+          location.href = 'sells.html?msg=新增成功&clearDate=true';
+        }
+        else {
+          this.$message({
+            message: result.msg,
+            type: 'error'
+          });
+        }
+      },
+      updateSell: async function () {
+        let sum = 0;
+        this.rows.filter(x => x.item != null).forEach(function (x) {
+          sum += x.total;
+        })
+        var result = await window.api.sells.update(
+          {
+            id: this.id,
+            no: this.sellNo,
+            date: this.date,
+            total: sum,
+            items: this.rows.filter(x => (x.id == 0 && x.item != null) || (x.id != 0 && x.updated)),
+            delItemIds: this.delItemIds
+          }
+        );
+
+        if (result.isSuccess) {
+          location.href = 'sells.html?msg=修改成功' + location.search.replace('?', '&');
+        }
+        else {
+          this.$message({
+            message: result.msg,
+            type: 'error'
+          });
+        }
+      },
+      addNewRow: function () {
+        this.rows.push({ id: 0, item: null, qty: 1, price: null, total: null })
+      },
+      cancel: function () {
+        location.href = 'sells.html'
+      },
+      isDate: function (value) {
+        return value instanceof Date && !isNaN(value);
+      },
+      dateToStr: function (date) {
+        if (!this.isDate(date)) {
+          return date;
+        }
+        let y = date.getFullYear().toString();
+        let m = (date.getMonth() + 1).toString();
+        let d = date.getDate().toString();
+        if (m.length == 1) {
+          m = '0' + m;
+        }
+        if (d.length == 1) {
+          d = '0' + d;
+        }
+
+        return `${y}-${m}-${d}`
+      },
+      deleteItem: function (row) {
+        if (row.id) {
+          this.delItemIds.push(row.id);
+        }
+        let idx = this.rows.findIndex(function (e) {
+          return e == this
+        }, row)
+
+        this.rows.splice(idx, 1);
+      },
+      getSummaries(param) {
+        const { columns, data } = param;
+        const sums = [];
+        columns.forEach((column, index) => {
+          if (index === 0) {
+            sums[index] = '';
+            return;
+          }
+          if (index === 1) {
+            sums[index] = '總計';
+            return;
+          }
+          if (index != 4)
+            return;
+          const values = data.map(item => Number(item[column.property]));
+          if (!values.every(value => isNaN(value))) {
+            sums[index] = values.reduce((prev, curr) => {
+              const value = Number(curr);
+              if (!isNaN(value)) {
+                return prev + curr;
+              } else {
+                return prev;
+              }
+            }, 0);
+            sums[index] = sums[index].toLocaleString() + ' 元';
+          } else {
+            sums[index] = 'N/A';
+          }
+        });
+
+        return sums;
+      },
+      save: async function () {
+        if (!this.validate()) {
+          return;
+        }
+        if (this.isAdd) {
+          await this.addSell();
+        }
+        else {
+          await this.updateSell();
+        }
+      },
+      selectFirstItem: function () {
+
+      },
+      validate: function () {
+        if (!this.customer) {
+          this.showWarning('請選擇 客戶');
+          return false;
+        }
+        if (!this.date) {
+          this.showWarning('請選擇 日期')
+          return false;
+        }
+
+        if (this.rows.filter(x => x.item != null).length == 0) {
+          this.showWarning('請輸入至少一筆產品')
+          return false;
+        }
+
+        let _this = {
+          validated: true,
+          vm: this
+        }
+        this.rows.forEach(function (row, idx) {
+          if (row.id && row.item == null) {
+            _this.vm.showWarning('請檢查第 ' + (idx + 1) + ' 筆產品有無填寫');
+            _this.validated = false;
+          }
+          if (row.item != null) {
+            if ((!row.qty) || row.price == null || row.price == '' || row.total == null || row.total == '') {
+              _this.vm.showWarning('請檢查第 ' + (idx + 1) + ' 筆產品的數量、單價和總計 有無填寫');
+              _this.validated = false;
+            }
+          }
+        }, _this);
+
+        return _this.validated;
+      },
+      showWarning: function (msg) {
+        this.$message({
+          message: msg,
+          type: 'warning'
+        });
+      },
+      priceChanged: function (row) {
+        row.total = row.qty * row.price;
+        row.updated = true;
+      },
+      qtyChanged: function (row) {
+        row.total = row.qty * row.price;
+        row.updated = true;
+      },
+      querySearch(queryString, cb) {
+        var customers = this.customers;
+        var results = queryString ? customers.filter(this.createFilter(queryString)) : customers;
+        // 调用 callback 返回建议列表的数据
+        cb(results);
+      },
+      queryItemSearch(queryString, cb) {
+        var items = this.items;
+        if (!queryString) {
+          cb(items);
+          return;
+        }
+        var results = items.filter(function (e) {
+          return e.raw.no.toLowerCase() == queryString.toLowerCase() || e.raw.name.toLowerCase() == queryString.toLowerCase();
+        })
+
+        var likes = items.filter(this.createLikeFilter(queryString));
+        likes.forEach(function (e) {
+          this.push(e)
+        }, results)
+        // 调用 callback 返回建议列表的数据
+        cb(results);
+      },
+      totalChanged: function (row) {
+        row.price = row.total / row.qty;
+        row.updated = true;
+      },
+      createFilter(queryString) {
+        return (item) => {
+          return (item.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0);
+        };
+      },
+      createLikeFilter(queryString) {
+        return (item) => {
+          return (item.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0)
+            && item.raw.no.toLowerCase() != queryString.toLowerCase()
+            && item.raw.name.toLowerCase() != queryString.toLowerCase();
+        };
+      },
+      loadAll() {
+        return window.api.customers.getAll()
+      },
+      loadItems() {
+        return window.api.items.get()
+      },
+      handleSelect(item) {
+        this.customer = item.raw;
+      },
+      handleItemSelect(item, idx) {
+        if (!this.rows[idx].qty) {
+          this.rows[idx].qty = 1;
+        }
+
+        this.rows[idx].item = item.raw;
+        this.rows[idx].price = item.raw.price;
+        this.rows[idx].total = this.rows[idx].price * this.rows[idx].qty;
+        this.rows[idx].updated = true;
+
+        if (this.rows.length == idx + 1) {
+          this.addNewRow();
+        }
+      }
+    },
+    watch: {
+    },
+    async mounted() {
+      let customers = await this.loadAll();
+      this.customers = customers.map(function (item) {
+        return {
+          value: item.no + ' (' + item.name + ')',
+          raw: item
+        }
+      })
+      let items = await this.loadItems();
+      this.items = items.map(function (item) {
+        return {
+          value: item.no + ' (' + item.name + ')',
+          raw: item
+        }
+      })
+
+      // 取得當前頁面 URL 的 search 參數
+      const params = new URLSearchParams(window.location.search);
+
+      // 使用 get() 方法獲取指定參數的值
+      const id = params.get('id');
+      if (id) {
+        this.id = parseInt(id);
+      }
+
+      if (this.isAdd) {
+        this.addNewRow();
+        this.addNewRow();
+        this.addNewRow();
+      } else {
+        const result = await window.api.sells.getById(this.id);
+        this.customer = result.customer;
+        this.customerNoName = `${this.customer.no}(${this.customer.name})`;
+        this.sell = result.sell;
+        this.date = this.sell.sellDate.replaceAll('/', '-')
+        this.sellNo = result.sell.no;
+        result.items.forEach(function (i) {
+          this.rows.push({
+            updated: false, id: i.id, item: { id: i.itemId, no: i.itemNo, name: i.itemName },
+            qty: i.qty, price: i.price, total: i.total, noname: `${i.itemNo}(${i.itemName})`
+          })
+        }, this);
+      }
+      setTimeout(hookEnterAsTab, 100);
+      setTimeout(function () {
+        $('input:visible:first').focus();
+      }, 100)
+    }
+  })
+</script>
+
+</html>

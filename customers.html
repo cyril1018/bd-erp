@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <!-- import CSS -->
+  <link rel="stylesheet" href="./element-ui/lib/theme-chalk/index.css">
+  <style>
+    [v-cloak] {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app" v-cloak>
+    <el-container>
+      <custom-menu></custom-menu>
+      <el-container>
+        <el-main>
+          <el-divider content-position="left">客戶管理</el-divider>
+          <span style="margin-top: 20px;" v-if="loading">載入中...</span>
+          <el-table v-else :data="filterRows" height="95vh" stripe >
+            <el-table-column prop="id" label="流水號" width="80">
+              <template slot="header" slot-scope="scope">
+                <el-button type="primary" @click="add" size="small">新增</el-button>
+              </template>
+              <template slot-scope="scope">
+                <span>{{scope.$index + 1}}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="no" label="編號" width="110">
+            </el-table-column>
+            <el-table-column prop="name" label="公司名稱" width="100">
+            </el-table-column>
+            <el-table-column prop="tel" label="電話" width="110">
+            </el-table-column>
+            <el-table-column prop="contact" label="聯絡人" width="100">
+            </el-table-column>
+            <el-table-column prop="addr" label="地址">
+            </el-table-column>
+            <el-table-column fixed="right" label="操作" width="200">
+              <template slot="header" slot-scope="scope">
+                <el-input v-model="search" size="mini" placeholder="輸入關鍵字搜尋" />
+              </template>
+              <template slot-scope="scope">
+                <template>
+                  <el-button @click="handleDelete(scope.row.id)" type="text" size="small">刪除</el-button>
+                  <el-button type="text" size="small" @click="edit(scope.row)">编辑</el-button>
+                </template>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-dialog :title="dialogTitle" :visible.sync="dialogVisible">
+            <el-form label-width="120px">
+              <el-form-item label="編號">
+                <el-input v-if="dialogData.id == 0" v-model="dialogData.no" autocomplete="off"></el-input>
+                <span v-else>{{dialogData.no}}</span>
+              </el-form-item>
+              <el-form-item label="公司名稱">
+                <el-input v-model="dialogData.name" autocomplete="off"></el-input>
+              </el-form-item>
+              <el-form-item label="電話">
+                <div v-for="t in dialogData.tel" style="margin-bottom: 5px;">
+                  <el-input style="width:80%" v-model="t.val" autocomplete="off"></el-input>
+                  <el-button size="small" type="text" @click="deleteDialogTel(t)">移除</el-button>
+                </div>
+                <el-button size="small" type="text" @click="dialogData.tel.push({val:''})">加入一筆電話</el-button>
+              </el-form-item>
+              <el-form-item label="地址">
+                <el-input v-model="dialogData.addr" autocomplete="off"></el-input>
+              </el-form-item>
+              <el-form-item label="聯絡人">
+                <el-input v-model="dialogData.contact" autocomplete="off"></el-input>
+              </el-form-item>
+            </el-form>
+            <div slot="footer" class="dialog-footer">
+              <el-button @click="dialogVisible = false">取 消</el-button>
+              <el-button type="primary" @click="save">儲 存</el-button>
+            </div>
+          </el-dialog>
+        </el-main>
+      </el-container>
+    </el-container>
+  </div>
+
+</body>
+<!-- import Vue before Element -->
+<script src="./vue.js"></script>
+<!-- import JavaScript -->
+<script src="./element-ui/lib/index.js"></script>
+<script src="./components/custom-menu.js"></script>
+<script>
+
+  const vm = new Vue({
+    el: '#app',
+    data: function () {
+      return {
+        dialogVisible: false,
+        rows: [],
+        search: '',
+        dialogData: { id: 0, no: null, name: null, tel: [], addr: null, contact: null },
+        formLabelWidth: '100%',
+        loading: true
+      }
+    },
+    computed: {
+      dialogTitle: function () {
+        if (this.dialogData.id) {
+          return '編輯客戶'
+        }
+        return '新增客戶'
+      },
+      filterRows: function () {
+        if (this.search === '')
+          return this.rows;
+        return this.rows.filter((row) => row.name?.toUpperCase().indexOf(this.search.toUpperCase()) >= 0
+          || row.no?.toUpperCase().indexOf(this.search.toUpperCase()) >= 0
+          || row.tel?.indexOf(this.search) >= 0
+          || row.addr?.indexOf(this.search) >= 0
+          || row.contact?.indexOf(this.search) >= 0
+        );
+      }
+    },
+    methods: {
+      routeTo: function (url) {
+        location.href = url;
+      },
+      reload: async function () {
+       this.loading = true;
+        let res = await window.api.customers.getAll();
+        while (this.rows.length > 0) {
+          this.rows.pop();
+        }
+
+        res.forEach(function (e) {
+          this.rows.push(e);
+        }, this);
+        this.loading = false;
+      },
+      add: function () {
+        this.dialogData.id = 0;
+        this.dialogData.no = null;
+        this.dialogData.name = null;
+        while (this.dialogData.tel.length > 0)
+          this.dialogData.tel.pop();
+        this.dialogData.tel.push({ val: '' });
+        this.dialogData.contact = null;
+        this.dialogData.addr = null;
+        this.dialogVisible = true;
+      },
+      handleDelete: async function (id) {
+        this.$confirm('將刪除此客戶, 是否繼續?', '提示', {
+          confirmButtonText: '確定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(async () => {
+          let res = await window.api.customers.delete(id);
+          if (res.isSuccess) {
+            this.$message({
+              type: 'success',
+              message: '删除成功!'
+            });
+            await this.reload();
+            return;
+          }
+
+          this.$message({
+            type: 'error',
+            message: res.msg
+          });
+        }).catch(action => {
+        });
+      },
+      deleteDialogTel: function (tel) {
+        let idx = this.dialogData.tel.findIndex((x) => x == tel);
+        this.dialogData.tel.splice(idx, 1);
+      },
+      edit: function (row) {
+        this.dialogData.id = row.id;
+        this.dialogData.no = row.no;
+        this.dialogData.name = row.name;
+        while (this.dialogData.tel.length > 0)
+          this.dialogData.tel.pop();
+        if (row.tel) {
+          row.tel.split(';').forEach(function (t) {
+            this.dialogData.tel.push({ val: t });
+          }, this);
+        }
+        this.dialogData.contact = row.contact;
+        this.dialogData.addr = row.addr;
+        this.dialogVisible = true;
+      },
+      save: async function () {
+        let res = await window.api.customers.save(this.dialogData);
+        if (res.isSuccess) {
+          this.dialogVisible = false;
+          vm.$message({
+            message: this.dialogData.id == 0 ? '新增成功!' : '修改成功!',
+            type: 'success'
+          });
+          await this.reload();
+        }
+        else {
+          vm.$message({
+            message: res.msg,
+            type: 'error'
+          });
+        }
+      }
+    },
+    watch: {
+    },
+    async beforeMount() {
+      await this.reload();
+    }
+  })
+
+</script>
+
+</html>
