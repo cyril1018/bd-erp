@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <!-- import CSS -->
+    <link rel="stylesheet" href="./element-ui/lib/theme-chalk/index.css" />
+    <style>
+      [v-cloak] {
+        display: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="app" v-cloak>
+      <el-container>
+        <custom-menu></custom-menu>
+        <el-container>
+          <el-main>
+            <el-divider content-position="left">
+              Google雲端硬碟資料庫備份設定
+            </el-divider>
+            <span style="margin-top: 20px" v-if="loading">載入中...</span>
+            <el-switch
+              v-model="enableBackup"
+              active-text="啟用"
+              inactive-text="停用"
+            >
+            </el-switch>
+            <br /><br />
+            <el-button type="success" @click="backup">手動備份</el-button>
+            <el-alert
+              v-if="backupStatus"
+              :title="backupStatus"
+              type="info"
+              :closable="false"
+              style="margin-top: 20px"
+            ></el-alert>
+          </el-main>
+        </el-container>
+      </el-container>
+    </div>
+  </body>
+  <!-- import Vue before Element -->
+  <script src="./vue.js"></script>
+  <!-- import JavaScript -->
+  <script src="./element-ui/lib/index.js"></script>
+  <script src="./components/custom-menu.js"></script>
+  <script>
+    // 创建 Vue 实例
+    new Vue({
+      el: "#app",
+      data: {
+        enableBackup: false,
+        loading: true,
+        backupStatus: "", // 新增备份状态
+      },
+      created() {
+        // 在组件创建时加载保存的设置
+        window.api.backup.getSettings().then((settings) => {
+          this.enableBackup = settings.enableBackup;
+          this.loading = false;
+        });
+      },
+      watch: {
+        // 监视 enableBackup 的变化，并自动保存设置
+        enableBackup(newValue) {
+          window.api.backup.saveSettings({
+            enableBackup: newValue,
+          });
+        },
+      },
+      methods: {
+        backup() {
+          // 手动备份数据库
+          this.backupStatus = "正在備份...";
+          window.api.backup.backupDatabase(true).then(() => {
+            this.backupStatus = "備份成功！";
+          }).catch(err => {
+            console.error("Backup error:", err);
+            this.backupStatus = "備份失敗！";
+          });
+        },
+      },
+    });
+  </script>
+</html>

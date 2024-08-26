@@ -6,33 +6,40 @@
  * https://www.electronjs.org/docs/latest/tutorial/sandbox
  */
 
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  onUpdateAvailable: (callback) => ipcRenderer.on('update_available', callback),
-  onUpdateDownloaded: (callback) => ipcRenderer.on('update_downloaded', callback),
-  restartApp: () => ipcRenderer.send('restart_app')
+contextBridge.exposeInMainWorld("electronAPI", {
+  onUpdateAvailable: (callback) => ipcRenderer.on("update_available", callback),
+  onUpdateDownloaded: (callback) =>
+    ipcRenderer.on("update_downloaded", callback),
+  restartApp: () => ipcRenderer.send("restart_app"),
 });
-contextBridge.exposeInMainWorld('api', {
+contextBridge.exposeInMainWorld("api", {
   customers: {
     getAll: () => ipcRenderer.invoke("customers:get-all"),
     getByKeyword: () => ipcRenderer.invoke("customers:get-all"),
-    save: (data) => ipcRenderer.invoke('customers:save', data),
-    delete:(id) =>ipcRenderer.invoke('customers:delete', id)
+    save: (data) => ipcRenderer.invoke("customers:save", data),
+    delete: (id) => ipcRenderer.invoke("customers:delete", id),
   },
   sells: {
     get: (qry) => ipcRenderer.invoke("sells:get", qry),
     getById: (id) => ipcRenderer.invoke("sells:getById", id),
-    add: (data) => ipcRenderer.invoke('sells:add', data),
-    update: (data) => ipcRenderer.invoke('sells:update', data),
-    delete: (id) => ipcRenderer.invoke('sells:delete', id),
+    add: (data) => ipcRenderer.invoke("sells:add", data),
+    update: (data) => ipcRenderer.invoke("sells:update", data),
+    delete: (id) => ipcRenderer.invoke("sells:delete", id),
   },
   items: {
     get: () => ipcRenderer.invoke("items:get"),
-    save: (data) => ipcRenderer.invoke('items:save', data),
-    delete:(id) =>ipcRenderer.invoke('items:delete', id)
+    save: (data) => ipcRenderer.invoke("items:save", data),
+    delete: (id) => ipcRenderer.invoke("items:delete", id),
   },
   test: {
-    getPath: () => ipcRenderer.invoke("test:getPath")
-  }
-})
+    getPath: () => ipcRenderer.invoke("test:getPath"),
+  },
+  backup: {
+    getSettings: () => ipcRenderer.invoke("get-settings"),
+    saveSettings: (settings) => ipcRenderer.invoke("save-settings", settings),
+    backupDatabase: (force) =>
+      ipcRenderer.invoke("backup:backupDatabase", force),
+  },
+});

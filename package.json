@@ -14,8 +14,11 @@
     "electron-builder": "^23.6.0"
   },
   "dependencies": {
+    "@google-cloud/local-auth": "^3.0.1",
     "electron-log": "^5.1.7",
     "electron-updater": "^6.2.1",
+    "google-auth-library": "^9.14.0",
+    "googleapis": "^142.0.0",
     "sqlite3": "^5.1.6"
   },
   "build": {
