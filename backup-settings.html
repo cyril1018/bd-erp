@@ -18,12 +18,16 @@
         <el-container>
           <el-main>
             <el-divider content-position="left">
-              Google雲端硬碟資料庫備份設定
+              Google 雲端硬碟資料庫備份設定
             </el-divider>
+            <!-- 添加描述 -->
+            <p>
+              自動備份功能會在程式啟動或關閉時檢查資料庫是否有異動，若有異動則會自動觸發備份。
+            </p>
             <span style="margin-top: 20px" v-if="loading">載入中...</span>
             <el-switch
               v-model="enableBackup"
-              active-text="啟用"
+              active-text="啟用自動備份"
               inactive-text="停用"
             >
             </el-switch>
